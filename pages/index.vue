@@ -6,7 +6,9 @@
       <h1 class="text-3xl font-bold text-center">Yoda Chatbot</h1>
     </header>
 
-    <main class="container mx-auto max-w-3xl my-10 flex-grow overflow-hidden">
+    <main
+      class="container mx-auto shadow-2xl max-w-3xl my-10 flex-grow overflow-hidden"
+    >
       <ChatBox />
     </main>
 
