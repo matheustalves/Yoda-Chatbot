@@ -18,7 +18,7 @@
       @submit.prevent="$fetch"
     >
       <input
-        v-model="messageText"
+        v-model="messageInput"
         class="p-2 rounded mr-1 text-black flex-grow"
         placeholder="say something"
         @keypress.enter.prevent="$fetch"
@@ -37,26 +37,38 @@
 export default {
   data() {
     return {
-      messageText: '',
+      messageInput: '',
       nextId: 0,
       nextFrom: 'user',
       messages: [],
+      noResults: false,
     }
   },
   async fetch() {
-    if (this.messageText !== '') {
-      this.saveMessage(this.messageText)
+    if (this.messageInput !== '') {
+      this.saveMessage(this.messageInput)
+      const userMessage = this.messageInput
+      this.messageInput = ''
 
       await fetch('http://localhost/api/', {
         headers: {
           'Content-Type': 'application/json',
-          userMessage: this.messageText,
+          userMessage,
         },
       })
         .then((res) => res.json())
         .then((result) => {
-          this.saveMessage(result)
-          this.messageText = ''
+          if (result.answers[0].flags.includes('no-results')) {
+            if (!this.noResults) {
+              this.saveMessage(result.answers[0].message)
+              this.noResults = true
+            } else {
+              this.saveMessage('casetinho')
+              this.noResults = false
+            }
+          } else {
+            this.saveMessage(result.answers[0].message)
+          }
         })
     }
   },
