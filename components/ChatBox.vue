@@ -11,19 +11,20 @@
         :from="from"
         :list="list"
       />
-      <p v-if="$fetchState.pending" class="text-sm">Yoda is typing...</p>
-      <div ref="bottom" :class="bigMessage ? 'mt-40' : 'mt-10'"></div>
+      <p v-if="loading" class="text-sm">Yoda is typing...</p>
+      <div ref="bottom"></div>
     </div>
 
     <form
       class="text-center flex items-center justify-center mt-5"
-      @submit.prevent="$fetch"
+      @submit.prevent="handleNewMessage"
     >
       <input
         v-model="messageInput"
         class="p-2 rounded mr-1 text-black flex-grow"
-        placeholder="say something"
-        @keypress.enter.prevent="$fetch"
+        placeholder="say something to yoda"
+        :disabled="loading"
+        @keypress.enter.prevent="handleNewMessage"
       />
       <button
         type="submit"
@@ -40,29 +41,48 @@ export default {
   data() {
     return {
       messageInput: '',
+      userMessage: '',
       nextId: 0,
       nextFrom: 'user',
       messages: [],
       noResults: false,
       bigMessage: false,
+      loading: false,
     }
   },
-  async fetch() {
-    if (this.messageInput !== '') {
-      this.bigMessage = false
-      this.saveMessage(this.messageInput, [])
-      const userMessage = this.messageInput
-      this.messageInput = ''
-
-      if (userMessage.includes('force')) {
-        this.bigMessage = true
-        await this.getForceResponse()
-      } else {
-        await this.getYodaResponse(userMessage)
+  mounted() {
+    if (localStorage.getItem('messages')) {
+      try {
+        this.messages = JSON.parse(localStorage.getItem('messages'))
+      } catch (e) {
+        localStorage.removeItem('messages')
       }
+      this.$nextTick(() => {
+        this.$refs.bottom.scrollIntoView({ behavior: 'smooth' })
+      })
     }
   },
   methods: {
+    async handleNewMessage() {
+      if (this.messageInput !== '') {
+        this.bigMessage = false
+
+        this.saveMessage(this.messageInput, [])
+
+        this.userMessage = this.messageInput
+        this.messageInput = ''
+
+        this.loading = true
+        if (this.userMessage.includes('force')) {
+          this.bigMessage = true
+          this.noResults = false
+          await this.getSwapiResponse('force')
+        } else {
+          await this.getYodaResponse(this.userMessage)
+        }
+        this.loading = false
+      }
+    },
     saveMessage(message, list) {
       this.messages.push({
         id: this.nextId++,
@@ -70,17 +90,24 @@ export default {
         from: this.nextFrom,
         list,
       })
-      this.nextFrom = this.nextFrom === 'user' ? 'yoda' : 'user'
 
-      this.$refs.bottom.scrollIntoView({ behavior: 'smooth' })
+      this.$nextTick(() => {
+        this.$refs.bottom.scrollIntoView({ behavior: 'smooth' })
+      })
+
+      const parsed = JSON.stringify(this.messages)
+      localStorage.setItem('messages', parsed)
+
+      this.nextFrom = this.nextFrom === 'user' ? 'yoda' : 'user'
     },
-    async getForceResponse() {
-      await fetch('https://inbenta-graphql-swapi-prod.herokuapp.com/api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+    async getSwapiResponse(type) {
+      let body = null
+      let message = null
+      let attribute1 = null
+      let attribute2 = null
+      let attribute3 = null
+      if (type === 'force') {
+        body = {
           query: `
             query {
               allFilms{
@@ -90,14 +117,41 @@ export default {
               }
             }
           `,
-        }),
+        }
+        message = 'The force is in these movies:'
+        attribute1 = 'allFilms'
+        attribute2 = 'films'
+        attribute3 = 'title'
+      } else {
+        body = {
+          query: `
+            query {
+              allPeople(first: 6){
+                people{
+                  name
+                }
+              }
+            }
+          `,
+        }
+        message =
+          "I haven't found any results, but here is a list of some Star Wars characters:"
+        attribute1 = 'allPeople'
+        attribute2 = 'people'
+        attribute3 = 'name'
+      }
+      await fetch('https://inbenta-graphql-swapi-prod.herokuapp.com/api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       })
         .then((res) => res.json())
         .then((result) => {
-          const message = 'The force is in this movies:'
           const list = []
-          for (const movie of result.data.allFilms.films) {
-            list.push(movie.title)
+          for (const item of result.data[attribute1][attribute2]) {
+            list.push(item[attribute3])
           }
           this.saveMessage(message, list)
         })
@@ -117,41 +171,13 @@ export default {
               this.noResults = true
             } else {
               this.bigMessage = true
-              this.getCharacters()
+              this.getSwapiResponse('characters')
               this.noResults = false
             }
           } else {
             this.saveMessage(result.answers[0].message, [])
+            this.noResults = false
           }
-        })
-    },
-    async getCharacters() {
-      await fetch('https://inbenta-graphql-swapi-prod.herokuapp.com/api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: `
-            query {
-              allPeople(first: 6){
-                people{
-                  name
-                }
-              }
-            }
-          `,
-        }),
-      })
-        .then((res) => res.json())
-        .then((result) => {
-          const message =
-            "I haven't found any results, but here is a list of some Star Wars characters:"
-          const list = []
-          for (const character of result.data.allPeople.people) {
-            list.push(character.name)
-          }
-          this.saveMessage(message, list)
         })
     },
   },
