@@ -12,7 +12,7 @@
         :list="list"
       />
       <p v-if="$fetchState.pending" class="text-sm">Yoda is typing...</p>
-      <div ref="bottom" :class="bigMessage ? 'mt-48' : 'mt-20'"></div>
+      <div ref="bottom" :class="bigMessage ? 'mt-40' : 'mt-10'"></div>
     </div>
 
     <form
