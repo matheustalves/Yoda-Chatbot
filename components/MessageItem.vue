@@ -18,6 +18,9 @@
       :class="from === 'user' ? 'bg-green-900' : 'bg-green-300 text-black'"
     >
       {{ content }}
+      <ul v-if="list.length != 0">
+        <li v-for="item in list" :key="item">✨ {{ item }}</li>
+      </ul>
     </div>
   </div>
 </template>
@@ -32,6 +35,10 @@ export default {
     from: {
       type: String,
       default: 'user',
+    },
+    list: {
+      type: Array,
+      default: () => [],
     },
   },
 }
