@@ -103,7 +103,7 @@ export default {
       this.nextFrom = this.nextFrom === 'user' ? 'yoda' : 'user'
     },
     async getYodaResponse(userMessage) {
-      await fetch('https://yoda-chatbot-api.herokuapp.com/api/', {
+      await fetch('https://yoda-chatbot-api.herokuapp.com/api', {
         headers: {
           'Content-Type': 'application/json',
           userMessage,
