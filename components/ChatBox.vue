@@ -2,7 +2,15 @@
   <div
     class="bg-green-600 rounded-lg border-2 border-gray-900 p-5 h-full flex flex-col"
   >
-    <div class="flex-grow overflow-auto p-3 content-between">
+    <div class="text-right">
+      <button
+        class="text-xs font-bold underline text-green-200"
+        @click="clearMessages"
+      >
+        clear chat
+      </button>
+    </div>
+    <div class="flex-grow overflow-auto p-3 content-between mt-5">
       <MessageItem
         v-for="{ id, content, from, list } in messages"
         :key="id"
@@ -41,12 +49,10 @@ export default {
   data() {
     return {
       messageInput: '',
-      userMessage: '',
       nextId: 0,
       nextFrom: 'user',
       messages: [],
       noResults: false,
-      bigMessage: false,
       loading: false,
     }
   },
@@ -65,20 +71,16 @@ export default {
   methods: {
     async handleNewMessage() {
       if (this.messageInput !== '') {
-        this.bigMessage = false
-
         this.saveMessage(this.messageInput, [])
-
-        this.userMessage = this.messageInput
+        const userMessage = this.messageInput
         this.messageInput = ''
 
         this.loading = true
-        if (this.userMessage.includes('force')) {
-          this.bigMessage = true
+        if (userMessage.includes('force')) {
           this.noResults = false
           await this.getSwapiResponse('force')
         } else {
-          await this.getYodaResponse(this.userMessage)
+          await this.getYodaResponse(userMessage)
         }
         this.loading = false
       }
@@ -91,14 +93,37 @@ export default {
         list,
       })
 
+      const parsed = JSON.stringify(this.messages)
+      localStorage.setItem('messages', parsed)
+
       this.$nextTick(() => {
         this.$refs.bottom.scrollIntoView({ behavior: 'smooth' })
       })
 
-      const parsed = JSON.stringify(this.messages)
-      localStorage.setItem('messages', parsed)
-
       this.nextFrom = this.nextFrom === 'user' ? 'yoda' : 'user'
+    },
+    async getYodaResponse(userMessage) {
+      await fetch('http://localhost/api/', {
+        headers: {
+          'Content-Type': 'application/json',
+          userMessage,
+        },
+      })
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.answers[0].flags.includes('no-results')) {
+            if (!this.noResults) {
+              this.saveMessage(result.answers[0].message, [])
+              this.noResults = true
+            } else {
+              this.getSwapiResponse('characters')
+              this.noResults = false
+            }
+          } else {
+            this.saveMessage(result.answers[0].message, [])
+            this.noResults = false
+          }
+        })
     },
     async getSwapiResponse(type) {
       let body = null
@@ -156,29 +181,12 @@ export default {
           this.saveMessage(message, list)
         })
     },
-    async getYodaResponse(userMessage) {
-      await fetch('http://localhost/api/', {
-        headers: {
-          'Content-Type': 'application/json',
-          userMessage,
-        },
-      })
-        .then((res) => res.json())
-        .then((result) => {
-          if (result.answers[0].flags.includes('no-results')) {
-            if (!this.noResults) {
-              this.saveMessage(result.answers[0].message, [])
-              this.noResults = true
-            } else {
-              this.bigMessage = true
-              this.getSwapiResponse('characters')
-              this.noResults = false
-            }
-          } else {
-            this.saveMessage(result.answers[0].message, [])
-            this.noResults = false
-          }
-        })
+    clearMessages() {
+      this.messages = []
+      this.nextId = 0
+      this.noResults = false
+      this.nextFrom = 'user'
+      localStorage.removeItem('messages')
     },
   },
 }
